@@ -1,9 +1,9 @@
 # Linux QA
 
-##What is it?
+## What is it?
 Linux QA is a utility to audit fresh linux(RHEL/Oracle Linux) installation per Organization's recommended standards.
 
-##Documentation
+## Documentation
 This utility is a bash script that checks for various configuration on the system. While execution this utility creates a temporary file under /tmp. The output file generated is in PDF format. The system performs following checks:
         1     OS, Release, and Kernel Version
         2     File System Information
@@ -28,7 +28,7 @@ Following are the important elements of this utility:
   - text2pdf: A utility that converts a text file into PDF.
   - qa: Linux Audit utility.
 
-##Installation
+## Installation
  - Copy the whole linuxqa directory on the machine to be audited (suggested place /root/linuxqa)
  - Change directory to linuxqa/bin
 ```
