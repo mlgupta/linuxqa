@@ -1,0 +1,441 @@
+# -*-Linux-Audit-script-*-
+#
+# functions     This file contains functions to be used by Linux Install
+#               Audit scripts.
+#
+
+##############################################################################
+# Check for error
+##############################################################################
+test_error()
+{
+    status=$1;
+
+    if [ "$status" != 0 ]
+    then
+       log.error ""
+       log.error "-------------------------------------------------------------------------------"
+       log.error "Error: At $2 Code: $status" 
+       log.error "-------------------------------------------------------------------------------"
+       exit 1
+    fi
+}
+
+##############################################################################
+# Check for error
+##############################################################################
+function showBar 
+{
+  percDone=$(builtin echo 'scale=2;'$1/$2*100 | bc)
+  barLen=$(builtin echo "${percDone}*70/100" | bc)
+  percDone=$(builtin echo ${percDone%'.00'})
+  bar=''
+  fills=''
+  for (( b=0; b<$barLen; b++ ))
+  do
+   bar=$bar"="
+  done
+  blankSpaces=$(builtin echo $((70-$barLen)))
+  for (( f=0; f<$blankSpaces; f++ ))
+  do
+   fills=${fills}" "
+  done
+
+  if [ "$percDone" = 100 ]
+  then
+    builtin echo -ne "[$bar>$fills]:$percDone%\n"
+  else
+    builtin echo -ne "[$bar>$fills]:$percDone%\r"
+  fi
+  }
+##############################################################################
+# Check OS Version
+##############################################################################
+check_os_version()
+{
+  log.debug "Check OS Version - Begin"
+
+  builtin echo ""
+  builtin echo "OS Version:"
+  print_separator
+  cat /etc/redhat-release
+  builtin echo ""
+  rpm -qf /etc/redhat-release
+  print_separator
+
+  builtin echo ""
+
+  builtin echo "Kernel Version:"
+  print_separator
+  uname -a
+  print_separator
+
+  log.debug "Check OS Version - End"
+}
+
+##############################################################################
+# Display File System Size
+##############################################################################
+display_fs_size()
+{
+  log.debug "Display File System Size - Begin"
+
+  builtin echo ""
+  builtin echo "Filesystem Size:"
+  print_separator
+  df -k
+  print_separator
+
+  builtin echo ""
+  log.debug "Display File System Size - End"
+}
+
+##############################################################################
+# Display Volume Groups
+##############################################################################
+display_vg()
+{
+  log.debug "Display Volume Groups - Begin"
+  builtin echo ""
+
+  builtin echo "VolumeGroups:"
+  print_separator
+  vgdisplay -s
+  print_separator
+
+  builtin echo ""
+  log.debug "Display Volume Groups - End"
+}
+
+##############################################################################
+# Display Logical Volume 
+##############################################################################
+display_lv()
+{
+  log.debug "Display Logical Volume - Begin"
+  builtin echo ""
+
+  builtin echo "VolumeGroups:"
+  print_separator
+  lvdisplay -C
+  print_separator
+
+  builtin echo ""
+  log.debug "Display Logical Volume - End"
+}
+
+##############################################################################
+# Check SNMP
+##############################################################################
+check_snmp()
+{
+  log.debug "Check SNMP - Begin"
+  builtin echo ""
+
+  result=`cat /etc/snmp/snmpd.conf | grep 1tsun1x`
+
+  builtin echo "SNMP Configuration:"
+  print_separator
+  builtin echo ${result}
+  [ -z "${result}" ] && builtin echo "SNMP configuration is BAD"
+  print_separator
+
+  builtin echo ""
+  builtin echo "SNMP Service Status:"
+  print_separator
+  service snmpd status
+  print_separator
+
+  log.debug "Check SNMP - End"
+}
+
+##############################################################################
+# Check Repo Registration
+##############################################################################
+check_repo_registration()
+{
+  log.debug "Check Repo Registration - Begin"
+  builtin echo ""
+
+  osRelease=`rpm -qf /etc/redhat-release`
+
+  builtin echo "Repository Configuration:"
+  print_separator
+
+  case "$osRelease" in
+  *oracle*)
+       if [ -f /etc/yumrepos.d/dbs.repo ]
+       then
+         builtin echo "Host is registered with repository dbso.dbsentry.com"
+       else
+         builtin echo "Host is not registered with repository dbso.dbsentry.com"
+       fi 
+       ;; 
+  *redhat*)
+       if [ `cat /etc/sysconfig/rhn/up2date | grep ^serverURL | grep dbs` ]
+       then
+         builtin echo "Host is registered with repository dbs.dbsentry.com"
+       else
+         builtin echo "Host is not registered with repository dbs.dbsentry.com"
+       fi 
+       ;; 
+  esac
+  print_separator
+
+  builtin echo ""
+  log.debug "Check Repo Registration - End"
+}
+
+##############################################################################
+# Check Patches
+##############################################################################
+check_patches()
+{
+  log.debug "Check Patches - Begin"
+  builtin echo ""
+
+  builtin echo "Pending patches:"
+  print_separator
+  yum -y check-update
+  print_separator
+
+  log.debug "Check Patches - End"
+}
+
+##############################################################################
+# List Services
+##############################################################################
+list_services()
+{
+  log.debug "List Services - Begin"
+  builtin echo ""
+
+  builtin echo "Services:"
+  print_separator
+  chkconfig --list
+  print_separator
+
+  log.debug "List Services - End"
+}
+
+##############################################################################
+# Check NTP
+##############################################################################
+check_ntp()
+{
+  log.debug "Check NTP - Begin"
+  builtin echo ""
+
+  builtin echo "NTP Configuration:"
+  print_separator
+  cat /etc/ntp.conf | grep ^server
+  print_separator
+
+  builtin echo ""
+
+  builtin echo "NTP Service Status:"
+  print_separator
+  service ntpd status
+  print_separator
+
+  builtin echo ""
+  log.debug "Check NTP - End"
+
+}
+
+##############################################################################
+# Check TSM
+##############################################################################
+check_tsm()
+{
+  log.debug "Check TSM - Begin"
+  builtin echo ""
+
+  builtin echo "TSM Process:"
+  print_separator
+  ps -ef | grep tsm | grep -v grep
+  print_separator
+
+  builtin echo ""
+
+  builtin echo "TSM Service Status:"
+  print_separator
+  service tsm status
+  [ "$?" = 1 ] && builtin echo "tsm service not defined"
+  
+  print_separator
+
+  builtin echo ""
+  log.debug "Check TSM - End"
+
+}
+
+##############################################################################
+# Check BMC Patrol
+##############################################################################
+check_bmc()
+{
+  log.debug "Check BMC Patrol - Begin"
+  builtin echo ""
+
+  builtin echo "BMC Patrol Process:"
+  print_separator
+  ps -ef | grep -i patrol | grep -v grep
+  print_separator
+
+  builtin echo ""
+
+  builtin echo "BMC Patrol Service Status:"
+  print_separator
+  service PatrolAgent status
+  [ "$?" = 1 ] && builtin echo "bmcpatrol service not defined"
+  print_separator
+
+  builtin echo ""
+  log.debug "Check BMC Patrol - End"
+
+}
+
+##############################################################################
+# Check Sendmail
+##############################################################################
+check_sendmail()
+{
+  log.debug "Check Sendmail - Begin"
+  builtin echo ""
+
+  builtin echo "Sendmail Configuration:"
+  print_separator
+  result=`cat /etc/mail/sendmail.mc | grep SMART  | grep ^define`
+
+  builtin echo ${result}
+  print_separator
+
+  builtin echo ""
+
+  builtin echo "Sendmail Service Status:"
+  print_separator
+  service sendmail status
+  print_separator
+
+  builtin echo ""
+  log.debug "Check Sendmail - End"
+}
+
+##############################################################################
+# Check Accounts
+##############################################################################
+check_accounts()
+{
+  log.debug "Check Accounts - Begin"
+  builtin echo ""
+
+  builtin echo "Account ssimpson:"
+  print_separator
+  id ssimpson
+  print_separator
+
+  builtin echo ""
+
+  builtin echo "sudo privileges for ssimpson:"
+  print_separator
+  cat /etc/sudoers | grep ^ssimpson
+  print_separator
+
+  builtin echo ""
+
+  builtin echo "Account atrium:"
+  print_separator
+  id atrium
+  print_separator
+
+  builtin echo ""
+
+  builtin echo "NCC User Accounts:"
+  print_separator
+  for user in `builtin echo ${NCCUSERS}`
+  do
+    id ${user}
+  done
+  print_separator
+
+  builtin echo ""
+
+  builtin echo "sudo privileges for NCC Users:"
+  print_separator
+  cat /etc/sudoers | grep NCC
+  print_separator
+
+  builtin echo ""
+
+  builtin echo "DBA Accounts:"
+  print_separator
+  for user in `builtin echo ${DBAUSERS}`
+  do
+    id ${user}
+  done
+  print_separator
+
+  builtin echo ""
+
+  builtin echo "sudo privileges for DBAs:"
+  print_separator
+  for user in `builtin echo ${DBAUSERS}`
+  do
+    cat /etc/sudoers | grep ${user}
+  done
+  print_separator
+
+  builtin echo ""
+  log.debug "Check Accounts - End"
+}
+
+##############################################################################
+# Manual Steps
+##############################################################################
+manual_steps()
+{
+  log.debug "Manual Steps - Begin"
+  builtin echo ""
+
+  print_separator
+  builtin echo "* System Scanned by Security Engineer"
+  builtin echo "* Verify OS License has been purchased"
+  builtin echo "* Firewall ports opened/white lists added per user requirements"
+  builtin echo "* Verify production VLAN and IP configuration"
+  builtin echo "* System Added to NCC Server list"
+  builtin echo "* System Added to IPCheck"
+  builtin echo "* System Added to EM7"
+  builtin echo "* Confirm Working Tivoli Backup"
+  print_separator
+
+  builtin echo ""
+  log.debug "Manual Steps - End"
+}
+##############################################################################
+# Print Header
+##############################################################################
+print_header()
+{
+  builtin echo "                          The National Academy of Sciences           Date: ${DATE}"
+  builtin echo "                                     QA Report                       Page: ${PGNUM}"
+#  printf "%*s\n" $(((${#HOST}+$COLUMNS)/2)) "$HOST"
+  builtin echo "Host: $HOST"
+  builtin echo ""
+}
+
+##############################################################################
+# Print Separator
+##############################################################################
+print_separator()
+{
+  builtin echo "-------------------------------------------------------------------------------------"
+}
+
+##############################################################################
+# Print End of Report
+##############################################################################
+print_end_of_report()
+{
+  builtin echo "                               **** END OF REPORT ***"
+}

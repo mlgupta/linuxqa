@@ -1,0 +1,141 @@
+#!/bin/bash
+
+DATE=`date +\%Y%\m%\d`
+
+read -d '' USAGE << DELIM 
+NAME       
+        $0 - QA Report for Linux Install (RHEL/Oracle)
+
+USAGE   
+        $0 [-H <hostname>] [-o <output report name>] [-c <config file>] [-h]
+
+OPTIONS
+        -H    Hostname for QA. If not specified, `hostname -s` will be 
+              used.
+
+        -o    Output PDF Report. If not specified, default report is 
+              generated.
+
+        -c    Config File. If not specified, qa.conf is used
+
+        -h    Display this help
+
+DESCRIPTION
+        This script generates a QA report for a linux install. The report
+        contains following:
+        1     OS, Release, and Kernel Version
+        2     File System Information
+        3     Volume Groups
+        4     Logical Volumes
+        5     SNMP Configuration
+        6     Repository Registration Status
+        7     Pending Patches
+        8     Services List
+        9     NTP Configuration
+       10     Sendmail Configuration
+       11     User Accounts
+       12     BMC Patrol Configuration
+       13     Tivoli TSM Configuration
+DELIM
+
+MYPATH=`dirname $0`
+
+. ${MYPATH}/functions
+. ${MYPATH}/log4bash.core
+
+while getopts ":H:och" opt; do
+  case $opt in
+    H)
+      HOST=${OPTARG}
+      ;;
+    o)
+      OUTPUT_FILE=${OPTARG}
+      ;;
+    c)
+      CONFIG_FILE=${OPTARG}
+      ;;
+    h)
+      builtin echo "${USAGE}"
+      exit
+      ;;
+    \?)
+      builtin echo "Invalid option: -$OPTARG" >&2
+      builtin echo "${USAGE}"
+      exit
+      ;;
+  esac
+done
+
+[ -z ${HOST} ] && HOST=`hostname`
+[ -z ${CONFIG_FILE} ] && CONFIG_FILE=${MYPATH}/qa.conf
+[ -z ${OUTPUT_FILE} ] && OUTPUT_FILE=${MYPATH}/../out/${HOST}_${DATE}.pdf
+
+if [ -f ${CONFIG_FILE} ]; then
+  . ${CONFIG_FILE}
+else
+  logger.error "Error: Config file not found ${CONFIG_FILE}. Aborting.."
+  exit 1
+fi
+
+DATE=`date +\%m/%\d/%\Y`
+PGNUM="1";
+PID=`builtin echo $$`
+TEMP_FILE="/tmp/${PID}.out"
+COLUMNS=86
+BOLD=`tput bold`
+NORMAL=`tput sgr0`
+##############################################################################
+# Main
+##############################################################################
+title[1]="# OS and Kernel Version:"
+title[2]="# File System Information:"
+title[3]="# Volume Groups:"
+title[4]="# Logical Volumes:"
+title[5]="# SNMP Configuration:"
+title[6]="# Repository Status:"
+title[7]="# Patch Status:"
+title[8]="# Services Configuration:"
+title[9]="# NTP Configuration:"
+title[10]="# Sendmail Configuration:"
+title[11]="# User Accounts:"
+title[12]="# Tivoli TSM Client:"
+title[13]="# BMC Patrol:"
+title[14]="# Verify following manually:"
+
+fcall[1]="check_os_version"
+fcall[2]="display_fs_size"
+fcall[3]="display_vg"
+fcall[4]="display_lv"
+fcall[5]="check_snmp"
+fcall[6]="check_repo_registration"
+fcall[7]="check_patches"
+fcall[8]="list_services"
+fcall[9]="check_ntp"
+fcall[10]="check_sendmail"
+fcall[11]="check_accounts"
+fcall[12]="check_tsm"
+fcall[13]="check_bmc"
+fcall[14]="manual_steps"
+
+total_steps=14
+
+for i in {1..14}
+do
+  PGNUM=${i}
+  print_header					>> ${TEMP_FILE}
+  builtin echo ${title[${i}]}			>> ${TEMP_FILE}
+  ul=`builtin echo ${title[${i}]} | sed s/./=/g`
+  builtin echo ${ul}				>> ${TEMP_FILE}
+  ${fcall[${i}]}				>> ${TEMP_FILE} 2>&1
+
+  [ "${i}" != 14 ] && builtin echo ""		>> ${TEMP_FILE}
+
+  showBar ${i} ${total_steps}
+done
+
+builtin echo ""					>> ${TEMP_FILE}
+print_end_of_report				>> ${TEMP_FILE}
+
+${MYPATH}/text2pdf -c${COLUMNS} ${TEMP_FILE} > ${OUTPUT_FILE}
+rm -f ${TEMP_FILE}
+builtin echo "PDF Report file: ${OUTPUT_FILE}"
